@@ -1,0 +1,2 @@
+# npm으로 설치한 라이브러리(수만 개 파일). package-lock.json으로 다시 설치할 수 있다.
+node_modules/
