@@ -1,5 +1,5 @@
 <!doctype html>
-<!-- 보석 맞추기 v1.0 · 2026-11-07 · 파일 하나로 도는 3매치 퍼즐 -->
+<!-- 보석 맞추기 v1.1 · 2026-11-07 · 파일 하나로 도는 3매치 퍼즐 (2×2 사각형 맞추기 추가) -->
 <html lang="ko">
 <head>
 <meta charset="utf-8">
@@ -54,7 +54,7 @@ button:active{transform:translateY(1px)}
 <svg width="0" height="0" style="position:absolute" aria-hidden="true"><defs id="defs"></defs></svg>
 
 <div class="wrap">
-  <h1>💎 보석 맞추기<small>v1.0</small></h1>
+  <h1>💎 보석 맞추기<small>v1.1</small></h1>
   <div class="hud">
     <div class="stat"><span>점수</span><b id="score">0</b></div>
     <div class="stat"><span>최고</span><b id="best">0</b></div>
@@ -73,11 +73,11 @@ button:active{transform:translateY(1px)}
     <button class="alt" id="hintBtn">💡 힌트 (-50점)</button>
     <button id="newBtn">🔄 새 게임</button>
   </div>
-  <div class="help">이웃한 보석을 끌거나 두 번 눌러 자리를 바꾸세요.<br>같은 보석 3개 이상을 줄 세우면 사라집니다. 연쇄되면 콤보 점수!</div>
+  <div class="help">이웃한 보석을 끌거나 두 번 눌러 자리를 바꾸세요.<br>같은 보석 3개 이상을 줄 세우거나 2×2 사각형으로 모으면 사라집니다. 연쇄되면 콤보 점수!</div>
 </div>
 
 <script>
-const VERSION = '1.0';
+const VERSION = '1.1';
 const N = 8;            // 판 크기
 const TYPES = 7;        // 보석 종류
 const GAME_SEC = 90;    // 제한 시간(초)
@@ -193,7 +193,14 @@ function lineAt(t, r, c) {
   for (let k = c + 1; k < N && t[r][k] === x; k++) h++;
   for (let k = r - 1; k >= 0 && t[k][c] === x; k--) v++;
   for (let k = r + 1; k < N && t[k][c] === x; k++) v++;
-  return h >= 3 || v >= 3;
+  if (h >= 3 || v >= 3) return true;
+  // (r,c)를 한 모서리로 하는 2×2 사각형 4가지
+  for (const [dr, dc] of [[-1, -1], [-1, 0], [0, -1], [0, 0]]) {
+    const r0 = r + dr, c0 = c + dc;
+    if (r0 < 0 || c0 < 0 || r0 + 1 >= N || c0 + 1 >= N) continue;
+    if (t[r0][c0] === x && t[r0][c0 + 1] === x && t[r0 + 1][c0] === x && t[r0 + 1][c0 + 1] === x) return true;
+  }
+  return false;
 }
 function types() { return grid.map(row => row.map(g => g.t)); }
 
@@ -230,6 +237,15 @@ function findMatches() {
       else { if (run >= 3) for (let k = r - run; k < r; k++) s.add(grid[k][c]); run = 1; }
     }
   }
+  // 2×2 사각형
+  s.square = false;
+  for (let r = 0; r < N - 1; r++) for (let c = 0; c < N - 1; c++) {
+    const x = grid[r][c].t;
+    if (grid[r][c + 1].t === x && grid[r + 1][c].t === x && grid[r + 1][c + 1].t === x) {
+      s.add(grid[r][c]); s.add(grid[r][c + 1]); s.add(grid[r + 1][c]); s.add(grid[r + 1][c + 1]);
+      s.square = true;
+    }
+  }
   return s;
 }
 
@@ -243,7 +259,8 @@ function freshTypes() {
         let x;
         do { x = rand(TYPES); }
         while ((c >= 2 && t[r][c - 1] === x && t[r][c - 2] === x) ||
-               (r >= 2 && t[r - 1][c] === x && t[r - 2][c] === x));
+               (r >= 2 && t[r - 1][c] === x && t[r - 2][c] === x) ||
+               (r >= 1 && c >= 1 && t[r - 1][c] === x && t[r][c - 1] === x && t[r - 1][c - 1] === x));
         t[r].push(x);
       }
     }
@@ -303,6 +320,7 @@ async function resolve(m, myGame) {
     const bonus = m.size >= 5 ? 2 : m.size === 4 ? 1.5 : 1;
     setScore(score + Math.round(m.size * 10 * combo * bonus));
     if (combo > 1) floatText(`콤보 x${combo}!`);
+    else if (m.square) floatText('사각형!');
     else if (m.size >= 5) floatText('대단해요!');
     await sleep(220);
     if (myGame !== gameNo) return;
